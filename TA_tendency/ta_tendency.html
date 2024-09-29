@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TA직무 적합성 자가진단</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f6f9;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .container {
+            background-color: #fff;
+            padding: 40px;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+            max-width: 600px;
+            width: 100%;
+        }
+
+        h1 {
+            color: #333;
+            font-size: 18px;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .question {
+            margin-bottom: 20px;
+            padding: 15px;
+            background-color: #f9fafc;
+            border-radius: 8px;
+            border: 1px solid #e3e7ec;
+        }
+
+        .answered {
+            background-color: #e2f7f7;
+        }
+
+        .question p {
+            font-size: 16px;
+            color: #555;
+            margin-bottom: 10px;
+        }
+
+        .question label {
+            display: inline-block;
+            margin-right: 15px;
+            cursor: pointer;
+        }
+
+        .question input[type="radio"] {
+            margin-right: 5px;
+            color: #333;
+        }
+
+        .submit-btn {
+            display: block;
+            width: 100%;
+            padding: 15px;
+            background-color: #009fb4;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-top: 30px;
+            transition: background-color 0.3s;
+        }
+
+        .submit-btn:hover {
+            background-color: #00bcd4;
+        }
+
+        #result {
+            margin-top: 20px;
+            padding: 20px;
+            background-color: #eef1f7;
+            border: 1px solid #d3d7dd;
+            border-radius: 8px;
+        }
+
+        #result h2 {
+            font-size: 18px;
+            margin-bottom: 10px;
+            color: #333;
+            text-align: center;
+        }
+
+        .result-each {
+            font-size: 13px;
+            font-weight: bold;
+            margin-top: 5px;
+            margin-bottom: 10px;
+            color: #00bcd4;
+            text-align: center;
+        }
+
+        .result-context {
+            font-size: 15px;
+            font-weight: bold;
+            margin-top: 20px;
+            margin-bottom: 10px;
+            color: #00bcd4;
+            text-align: center;
+        }
+
+        .graph-container {
+            position: relative;
+            height: 30px;
+            width: 100%;
+            background-color: #e9ecef;
+            border-radius: 5px;
+            border: 2px solid #333;
+            margin-top: 10px;
+        }
+
+        .graph-bar {
+            background-color: #00bcd4;
+            height: 100%;
+            line-height: 30px;
+            text-align: center;
+            color: white;
+            border-radius: 5px;
+        }
+
+        .graph-label {
+            transform: translateY(-120%);
+            text-align: center;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .submit-btn:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1 id="main-title"></h1>
+
+        <form id="survey-form"></form>
+
+        <button type="button" id="submit-btn" class="submit-btn" onclick="submitSurvey()" disabled>결과 확인</button>
+
+        <div id="result" style="display: none;">
+            <div id="result-each" class="result-each"></div>
+            <div id="graph-container" class="graph-container">
+                <div id="graph-bar" class="graph-bar"></div>
+                <div id="graph-label" class="graph-label">0</div>
+            </div>
+            <div id="result-context" class="result-context"></div>
+        </div>
+    </div>
+    <script>
+        // JSON 파일 로드 및 파싱
+        fetch('https://x2mj.github.io/TA_tendency/data/questions.json')
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('main-title').textContent = data.title;
+                generateSurvey(data.questions);
+            })
+            .catch(error => console.error('Error loading JSON file:', error));
+
+        // 설문 생성
+        function generateSurvey(questions) {
+            var form = document.getElementById('survey-form');
+            form.innerHTML = ''; // 기존 내용 지우기
+
+            questions.forEach(function (question, index) {
+                var questionDiv = document.createElement('div');
+                questionDiv.className = 'question';
+
+                var questionTitle = document.createElement('p');
+                questionTitle.innerHTML = (index + 1) + ') ' + question.text;
+                questionDiv.appendChild(questionTitle);
+
+                // 답변 순서: "그렇다", "보통", "아니다"
+                ['yes', 'unknown', 'no'].forEach(function (answer) {
+                    var label = document.createElement('label');
+                    var radio = document.createElement('input');
+                    radio.type = 'radio';
+                    radio.name = 'q' + (index + 1);
+                    radio.value = answer;
+                    radio.dataset.type = question.type; // type을 저장
+                    radio.onchange = function () {
+                        markAnswered(questionDiv);
+                        checkAllAnswered();
+                    };
+                    var labelText = answer === 'yes' ? ' 그렇다' : answer === 'no' ? ' 아니다' : ' 보통';
+                    label.appendChild(radio);
+                    label.appendChild(document.createTextNode(labelText));
+                    questionDiv.appendChild(label);
+                });
+
+                form.appendChild(questionDiv);
+            });
+        }
+
+        // 답변 완료된 문항에 배경색 추가
+        function markAnswered(questionDiv) {
+            questionDiv.classList.add('answered');
+        }
+
+        // 모든 질문에 답했는지 확인
+        function checkAllAnswered() {
+            var form = document.getElementById('survey-form');
+            var questions = form.querySelectorAll('.question');
+            var allAnswered = true;
+
+            questions.forEach(function (question) {
+                if (!question.querySelector('input[type="radio"]:checked')) {
+                    allAnswered = false;
+                }
+            });
+
+            document.getElementById('submit-btn').disabled = !allAnswered;
+        }
+
+        // 설문 제출 및 채점
+        function submitSurvey() {
+            var form = document.getElementById('survey-form');
+            var formData = new FormData(form);
+
+            var scores = {};
+            var totalQuestions = form.querySelectorAll('.question').length;
+
+            // 각 질문에 대해 점수 계산
+            for (var i = 1; i <= totalQuestions; i++) {
+                var answer = formData.get('q' + i);
+                var radio = form.querySelector('input[name="q' + i + '"]:checked');
+                var type = radio.dataset.type;
+
+                if (!scores.hasOwnProperty(type)) {
+                    scores[type] = { score: 0, maxScore: 0 };
+                }
+
+                scores[type].maxScore += 2; // 각 질문의 최대 점수는 2
+                if (answer === 'yes') {
+                    scores[type].score += 2; // 그렇다 -> +2
+                } else if (answer === 'unknown') {
+                    scores[type].score += 1; // 보통 -> +1
+                }
+            }
+
+            displayEachScores(scores);
+            renderGraph(scores);
+            window.scrollTo(0, document.body.scrollHeight);
+        }
+
+        // 결과 설명 출력 (타입별 백분율로)
+        function displayEachScores(scores) {
+            var resultText = '';
+            for (var type in scores) {
+                var percentage = (scores[type].score / scores[type].maxScore) * 10;
+                resultText += type + ': ' + percentage.toFixed(1) + '\n';
+            }
+            document.getElementById('result-each').innerText = resultText;
+        }
+
+        // 그래프 출력
+        function renderGraph(scores) {
+            var graphBar = document.getElementById('graph-bar');
+            var graphLabel = document.getElementById('graph-label');
+
+            // 모든 타입에 대한 총점 계산
+            var totalScore = 0;
+            var totalMaxScore = 0;
+
+            for (var type in scores) {
+                totalScore += scores[type].score;
+                totalMaxScore += scores[type].maxScore;
+            }
+
+            // var percentage = (totalScore / totalMaxScore) * 100;
+            // graphBar.style.width = percentage + '%';
+
+            var totalScore = Math.round(Math.pow(totalScore / totalMaxScore, 1.25) * 100);
+            graphBar.style.width = totalScore + '%';
+
+            graphLabel.textContent = totalScore;
+
+            document.getElementById('result').style.display = 'block';
+
+            displayResultContext(totalScore);
+        }
+
+        function displayResultContext(totalSore) {
+            var message = "";
+            if (totalSore < 50) {
+                message = "테크니컬 아트 분야에 특별한 관심이 없음";
+            } else if (totalSore < 65) {
+                message = "컴퓨터 그래픽에 대한 관심이 있지만 적극적이지 않음";
+            } else if (totalSore < 75) {
+                message = "컴퓨터 그래픽에 대해 이해와 관심이 있고, 성장 가능성 있음";
+            } else if (totalSore < 85) {
+                message = "테크니컬 아티스트 직무에 필요한 성향을 갖추고 있으며, 발전하려는 의지가 있음";
+            } else if (85 <= totalSore) {
+                message = "테크니컬 아티스트 직무에 매우 적합한 성향";
+            }
+            document.getElementById('result-context').innerText = message;
+        }
+    </script>
+</body>
+</html>
